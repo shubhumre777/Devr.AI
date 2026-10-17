@@ -1,10 +1,10 @@
-from app.db.weaviate.weaviate_client import get_client
+from backend.app.database.weaviate.client import get_client
 from datetime import datetime
 from uuid import uuid4
-from app.model.weaviate.models import (
+from backend.app.models.database.weaviate import (
+    WeaviateRepository,
+    WeaviatePullRequest,
     WeaviateUserProfile,
-    WeaviateCodeChunk,
-    WeaviateInteraction
 )
 
 
@@ -41,7 +41,7 @@ def insert_user_profile():
 def get_user_profile_by_id(user_id: str):
     client = get_client()
     try:
-        questions = client.collections.get("weaviate_user_profile"")
+        questions = client.collections.get("weaviate_user_profile")
         response = questions.query.bm25(
             query=user_id,
             properties=["supabaseUserId", "profileSummary", "primaryLanguages", "expertiseAreas"]
@@ -54,7 +54,7 @@ def get_user_profile_by_id(user_id: str):
         return None
 
 def update_user_profile(user_id: str):
-    questions = get_client().collections.get("weaviate_user_profile"")
+    questions = get_client().collections.get("weaviate_user_profile")
     try:
         user_profile = questions.query.bm25(
             query=user_id,
@@ -73,7 +73,7 @@ def update_user_profile(user_id: str):
         return None
 
 def delete_user_profile(user_id: str):
-    questions = get_client().collections.get("weaviate_user_profile"")
+    questions = get_client().collections.get("weaviate_user_profile")
     try:
         deleted = questions.data.delete_by_id(user_id)
         if deleted:

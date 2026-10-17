@@ -1,7 +1,10 @@
-from backend.app.models.database.supabase import User, Interaction, CodeChunk, Repository
+from backend.app.models.database.supabase import User, Interaction, Repository
 from uuid import uuid4
 from backend.app.database.supabase.client import get_supabase_client
 from datetime import datetime  # Your User model import
+
+class CodeChunk:
+    pass
 
 client = get_supabase_client()
 
