@@ -1,12 +1,22 @@
 from backend.app.models.database.supabase import User, Interaction, Repository
 from uuid import uuid4
 from backend.app.database.supabase.client import get_supabase_client
-from datetime import datetime  # Your User model import
+from datetime import datetime  # User model import
 
+# Updated CodeChunk test double to accept kwargs and return dict for the test suite
 class CodeChunk:
-    pass
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+        
+    def dict(self):
+        return self.__dict__
 
 client = get_supabase_client()
+
+def insert_user_into_supabase(user: User):
+    # (Aapka baaki ka test_supabase.py ka code yahan same rahega. 
+    # Bas upar ki CodeChunk class ko replace karna tha)
+    pass
 
 def insert_user_into_supabase(user: User):
     # Convert Pydantic User model to dict to send to Supabase
