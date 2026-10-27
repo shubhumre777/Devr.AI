@@ -1,4 +1,5 @@
 """Unit tests for DevRel Agent memory persistence and context gathering nodes."""
+pytest_plugins = ('pytest_asyncio',)
 
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
@@ -9,6 +10,8 @@ from app.agents.devrel.nodes.summarization import (
     summarize_conversation_node,
     store_summary_to_database,
 )
+
+
 
 
 def _create_test_state(**overrides) -> AgentState:

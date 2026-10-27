@@ -11,7 +11,6 @@ supabase = get_supabase_client()
 def isoformat_or_none(dt: Optional[datetime]) -> Optional[str]:
     return dt.isoformat() if dt else None
 
-
 logger = logging.getLogger(__name__)
 
 # Configuration constants
@@ -22,7 +21,6 @@ async def check_summarization_needed(state: AgentState) -> Dict[str, Any]:
     """
     Check if summarization is needed and update interaction count
     """
-
     current_count = getattr(state, 'interaction_count', 0)
     new_count = current_count + 1
 
@@ -106,13 +104,18 @@ async def summarize_conversation_node(state: AgentState, llm) -> Dict[str, Any]:
                 "key_topics": new_topics,
             }
         )
-        await store_summary_to_database(updated_state)
+        
+        # CodeRabbit Fix: Check if database write succeeded
+        is_saved = await store_summary_to_database(updated_state)
 
         logger.info(f"Conversation summarized successfully for session {state.session_id}")
 
+        # CodeRabbit Fix: Only reset the counter if saved successfully
+        reset_count = -current_count if is_saved else 0
+
         return {
             "conversation_summary": new_summary,
-            "interaction_count": -current_count,
+            "interaction_count": reset_count,
             "summarization_needed": False,
             "key_topics": new_topics
         }
@@ -144,7 +147,7 @@ async def _extract_key_topics(summary: str, llm) -> list[str]:
         logger.error(f"Error extracting topics: {str(e)}")
         return []
 
-async def store_summary_to_database(state: AgentState) -> None:
+async def store_summary_to_database(state: AgentState) -> bool:
     """Store the summary in Supabase database"""
     logger.info(f"Storing summary for session {state.session_id} into conversation_context")
 
@@ -152,7 +155,7 @@ async def store_summary_to_database(state: AgentState) -> None:
         # Validate required fields
         if not state.user_id or not state.platform:
             logger.error(f"Missing required fields: user_id={state.user_id}, platform={state.platform}")
-            return
+            return False
 
         user_uuid = state.context.get("user_uuid")
 
@@ -164,7 +167,7 @@ async def store_summary_to_database(state: AgentState) -> None:
 
             if not user_response.data:
                 logger.error(f"User with {platform_column} '{platform_id}' not found in users table.")
-                return
+                return False
 
             user_uuid = user_response.data[0]['id']
             logger.info(f"Found user UUID: {user_uuid} for {platform_column}: {platform_id}")
@@ -195,8 +198,11 @@ async def store_summary_to_database(state: AgentState) -> None:
         # Checks
         if response.data and len(response.data) > 0:
             logger.info(f"✅ Summary stored successfully for session {state.session_id}")
+            return True
         else:
             logger.error(f"❌ Supabase upsert failed for session {state.session_id}: {response}")
+            return False
 
     except Exception as e:
         logger.error(f"Error while storing summary: {str(e)}")
+        return False
