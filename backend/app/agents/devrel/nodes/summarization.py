@@ -31,7 +31,7 @@ async def check_summarization_needed(state: AgentState) -> Dict[str, Any]:
 
     logger.info(f"Session {state.session_id}: "
                 f"Messages: {len(state.messages)}, "
-                f"Interaction count: {current_count} → {new_count}, "
+                f"Interaction count: {current_count} -> {new_count}, "
                 f"Threshold: {SUMMARIZATION_THRESHOLD}")
 
     updates = {
@@ -99,6 +99,15 @@ async def summarize_conversation_node(state: AgentState, llm) -> Dict[str, Any]:
 
         new_topics = await _extract_key_topics(new_summary, llm)
 
+        # Persist the updated summary, topics, and current interaction count before resetting the counter
+        updated_state = state.model_copy(
+            update={
+                "conversation_summary": new_summary,
+                "key_topics": new_topics,
+            }
+        )
+        await store_summary_to_database(updated_state)
+
         logger.info(f"Conversation summarized successfully for session {state.session_id}")
 
         return {
@@ -120,9 +129,9 @@ async def _extract_key_topics(summary: str, llm) -> list[str]:
     try:
         topic_prompt = f"""Extract the key technical topics from this conversation summary.
         Return only topic names separated by commas.
-        
+
         Summary: {summary}
-        
+
         Topics:"""
 
         response = await llm.ainvoke([HumanMessage(content=topic_prompt)])
@@ -162,12 +171,20 @@ async def store_summary_to_database(state: AgentState) -> None:
         else:
             logger.info(f"Using cached user UUID from context: {user_uuid}")
 
+        # Fetch existing total_interactions to accumulate across summarization resets
+        existing_total = 0
+        existing_ctx = await supabase.table("conversation_context").select("total_interactions").eq("user_id", user_uuid).limit(1).execute()
+        if existing_ctx.data and len(existing_ctx.data) > 0:
+            existing_total = existing_ctx.data[0].get("total_interactions") or 0
+
+        total_interactions = existing_total + max(0, state.interaction_count)
+
         # Record to insert/update
         record = {
             "user_id": user_uuid,
             "conversation_summary": state.conversation_summary,
             "key_topics": state.key_topics,
-            "total_interactions": state.interaction_count,
+            "total_interactions": total_interactions,
             "session_start_time": isoformat_or_none(state.session_start_time),
             "session_end_time": isoformat_or_none(datetime.now()),
         }
@@ -182,4 +199,4 @@ async def store_summary_to_database(state: AgentState) -> None:
             logger.error(f"❌ Supabase upsert failed for session {state.session_id}: {response}")
 
     except Exception as e:
-        logger.error(f"Unexpected error while storing summary: {str(e)}")
+        logger.error(f"Error while storing summary: {str(e)}")
